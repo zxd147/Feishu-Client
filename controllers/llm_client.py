@@ -215,7 +215,7 @@ class DifyClient(BaseLLMClient):
                 get_response = await self.client.get(self.conv_endpoint, params=conv_params, headers=self.headers)
                 conversations_id = get_response.json().get("data", [])[0]["id"]
                 user_info[user_name] = conversations_id
-                gen = await self.stream_parser(response)  # 使用注入的解析器
+                gen = self.stream_parser(response)  # 使用注入的解析器
                 yield gen
         except httpx.HTTPStatusError as exc:
             logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
