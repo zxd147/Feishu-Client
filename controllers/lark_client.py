@@ -93,7 +93,7 @@ class Feishu:
 
         return card_create_response.data.card_id
 
-    async def send_card(self, card_id, is_p2p, chat_id, open_id):
+    async def send_card(self, card_id, is_p2p, open_id, chat_id):
 
         if is_p2p:
             response = self._send_message("open_id", open_id, "interactive", "{\"type\":\"card\",\"data\":{\"card_id\":\"" + card_id + "\"}}")
