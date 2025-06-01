@@ -59,6 +59,7 @@ class BaseLLMClient:
     @asynccontextmanager
     async def _make_stream_request(self, params, **kwargs):
         """异步流式HTTP请求核心实现（httpx版）"""
+        gen = None  # 显式初始化变量
         try:
             logger.info(f"LLM request params: ---\n{params}\n---")
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
