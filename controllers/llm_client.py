@@ -55,6 +55,9 @@ class BaseLLMClient:
         except httpx.HTTPStatusError as exc:
             logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
             raise
+        finally:
+            if hasattr(gen, 'aclose'):  # 检查是否为生成器
+                await gen.aclose()  # 显式关闭
 
     @asynccontextmanager
     async def _make_stream_request(self, params, **kwargs):
@@ -82,7 +85,7 @@ class BaseLLMClient:
             answer = ''
             response_data = "streaming...\n"
             async for line in response.aiter_lines():
-                content, answer, response_data = self.parse_event_stream(line, answer, response_data)
+                content, answer, response_data = await self.parse_event_stream(line, answer, response_data)
                 if content is None:
                     continue
         else:
@@ -101,7 +104,7 @@ class BaseLLMClient:
             answer = ''
             response_data = "streaming...\n"
             async for line in response.aiter_lines():
-                content, _, response_data = self.parse_event_stream(line, answer, response_data)
+                content, _, response_data = await self.parse_event_stream(line, answer, response_data)
                 if content is None:
                     continue
                 yield content
@@ -191,7 +194,8 @@ class DifyClient(BaseLLMClient):
             logger.info(f"LLM request params: ---\n{params}\n---")
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 get_response = await self.client.get(self.conv_endpoint, headers=self.headers, params=conv_params)
-                conversations_id = get_response.json().get("data", [])[0]["id"]
+                conv_data = get_response.json()
+                conversations_id = conv_data.get("data", [])[0]["id"]
                 user_info[user_name] = conversations_id
                 answer = await self.parser(response)  # 使用注入的解析器
             return answer

@@ -19,7 +19,7 @@ class FeishuRobot:
         base_url = settings.config.llm_models[model_name].base_url
         chat_endpoint = settings.config.llm_models[model_name].chat_endpoint
         conv_endpoint = settings.config.llm_models[model_name].conv_endpoint
-        api_key = settings.config.llm_models[model_name].api_key
+        api_key = settings.dify_fs_secret
         concurrency_limit = settings.config.llm_models[model_name].concurrency_limit
         timeout = settings.config.llm_models[model_name].timeout
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
