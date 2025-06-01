@@ -1,5 +1,6 @@
 import json
-from typing import Optional, Callable, AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Optional, Any, Callable, AsyncGenerator
 
 import httpx
 
@@ -10,13 +11,14 @@ logger = get_loger()
 
 
 class BaseLLMClient:
-    def __init__(self, base_url, endpoint, headers, concurrency_limit=10, timeout=30, response_parser: Optional[Callable] = None):
+    def __init__(self, base_url, chat_endpoint, headers, concurrency_limit=10, timeout=30, callback_parser: Optional[Callable[[Any], Any]] = None, **kwargs):
         self.base_url = base_url
-        self.endpoint = endpoint
+        self.chat_endpoint = chat_endpoint
         self.headers = headers
-        self.parser = response_parser or self._default_parser
-        self.stream_parser = response_parser or self._default_stream_parser
+        self.parser = callback_parser or self._default_parser
+        self.stream_parser = callback_parser or self._default_stream_parser
         self.make_request = self._make_request
+        self.make_stream_request = self._make_stream_request
         # 配置连接池参数（等效于原TCPConnector）
         self.client = httpx.AsyncClient(base_url=base_url, limits=httpx.Limits(max_connections=concurrency_limit),
             timeout=httpx.Timeout(timeout), http2=True, follow_redirects=True)
@@ -24,160 +26,283 @@ class BaseLLMClient:
     async def close(self):
         await self.client.aclose()  # 显式关闭连接池
 
-    async def get_completion(self, params) -> str:
+    async def get_completion(self, params, **kwargs) -> str:
         """统一请求入口，子类可覆盖具体解析逻辑"""
         try:
-            response = await self.make_request(params)
-            answer = await self.parser(response)  # 使用注入的解析器
+            answer = await self.make_request(params, **kwargs)
             return answer
         except (httpx.HTTPError, httpx.RequestError, json.JSONDecodeError, KeyError, Exception) as exc:
             log_exception(exc)
             raise
 
-    async def get_stream_completion(self, params) -> AsyncGenerator[str, None]:
-        """统一请求入口，子类可覆盖具体解析逻辑"""
+    async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
+        """统一流式请求入口，子类可覆盖具体解析逻辑"""
         try:
-            response = await self.make_request(params)
-            generator = self.stream_parser(response)
-            async for content in generator:
-                yield content  # 直接传递数据流
-        except (httpx.HTTPError, httpx.RequestError, httpx.StreamError,
-                httpx.RemoteProtocolError, json.JSONDecodeError, KeyError, Exception) as exc:
+            async with self.make_request(params, **kwargs) as generator:
+                async for content in generator:
+                    yield content
+        except (httpx.HTTPError, httpx.RequestError, httpx.StreamError, httpx.RemoteProtocolError, json.JSONDecodeError, KeyError, Exception) as exc:
             log_exception(exc)
             raise
 
-    async def _make_request(self, params):
+    async def _make_request(self, params, **kwargs):
         """异步HTTP请求核心实现（httpx版）"""
         try:
-            param_json = params.model_dump()
-            logger.info(f"LLM request params: ---\n{param_json}\n---")
-            response = await self.client.post(self.endpoint, headers=self.headers, json=param_json)
-            return response
+            param_dict = params.model_dump()
+            logger.info(f"LLM request params: ---\n{param_dict}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+                answer = await self.parser(response)  # 使用注入的解析器
+            return answer
         except httpx.HTTPStatusError as exc:
-            logger.error(f'LLM response failed with status code: {exc.response.status_code}. ')
+            logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
             raise
 
-    @staticmethod
-    async def _default_parser(response) -> str:
-        """默认解析逻辑, 动态解析响应：支持JSON和流式"""
-        assert response.status_code == 200, f"LLM response session failed with status code: {response.status_code}, text: {response.text}"
-        logger.info(f'LLM response session successfully with status code: {response.status_code}, text: {response.text}')
-        answer = ''
-        response_data = ''
+    @asynccontextmanager
+    async def _make_stream_request(self, params, **kwargs):
+        """异步流式HTTP请求核心实现（httpx版）"""
+        try:
+            param_dict = params.model_dump()
+            logger.info(f"LLM request params: ---\n{param_dict}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+                gen = await self.stream_parser(response)  # 使用注入的解析器
+                yield gen
+        except httpx.HTTPStatusError as exc:
+            logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
+            raise
+        finally:
+            if hasattr(gen, 'aclose'):  # 检查是否为生成器
+                await gen.aclose()  # 显式关闭
+
+    async def _default_parser(self, response) -> str:
+        """默认解析逻辑, 动态解析响应：支持JSON和SSE"""
+        await self.assert_response(response)
         content_type = (getattr(response, 'content_type', None) or response.headers.get('Content-Type', '') or '').lower()
         if content_type.split(';')[0].strip() == 'application/json':
-            response_data = response.json()  # 同步方法（httpx 已自动处理编码）
-            answer = response_data.get('answer', '')
-            response_data = "blocking...\n" + json.dumps(response_data, ensure_ascii=False, indent=4)
+            response_data = "blocking...\n"
+            _, answer, response_data = await self.parse_json_response(response, response_data)
         elif content_type.split(';')[0].strip() == 'text/event-stream':
-            async for line in response.aiter_lines():  # 使用httpx原生流式迭代器
-                response_data += "streaming...\n"
-                line = line.strip().replace('data: ', '', 1)
-                response_data += line + '\n'
-                if not line or line == "[DONE]":
+            answer = ''
+            response_data = "streaming...\n"
+            async for line in response.aiter_lines():
+                content, answer, response_data = self.parse_event_stream(line, answer, response_data)
+                if content is None:
                     continue
-                data = json.loads(line)
-                if content := data.get('answer'):
-                    answer += content
         else:
             raise ValueError(f"Unsupported response.content_type: {content_type}")
         logger.info(f'LLM response_data: ===\n{response_data}\n===')
         return answer
 
-    @staticmethod
-    async def _default_stream_parser(response) -> AsyncGenerator[str, None]:
-        """默认解析逻辑, 动态解析响应：支持JSON和流式"""
-        assert response.status_code == 200, f"LLM response session failed with status code: {response.status_code}, text: {response.text}"
-        logger.info(f"LLM response session successfully with status code: {response.status_code}, text: {response.text}")
-        answer = ''
-        response_data = ''
+    async def _default_stream_parser(self, response) -> AsyncGenerator[str, None]:
+        """默认解析逻辑, 动态解析响应：支持JSON和SSE"""
+        await self.assert_response(response)
         content_type = (getattr(response, 'content_type', None) or response.headers.get('Content-Type', '') or '').lower()
         if content_type.split(';')[0].strip() == 'application/json':
-            response_data = response.json()  # 同步方法（httpx 已自动处理编码）
-            answer = response_data.get('answer', '')
-            content = answer
-            response_data = "blocking...\n" + json.dumps(response_data, ensure_ascii=False, indent=4)
+            response_data = "blocking...\n"
+            content, _, response_data = await self.parse_json_response(response, response_data)
         elif content_type.split(';')[0].strip() == 'text/event-stream':
-            async for line in response.aiter_lines():  # 使用httpx原生流式迭代器
-                response_data += "streaming...\n"
-                line = line.strip().replace('data: ', '', 1)
-                response_data += line + '\n'
-                if not line or line == "[DONE]":
+            answer = ''
+            response_data = "streaming...\n"
+            async for line in response.aiter_lines():
+                content, _, response_data = self.parse_event_stream(line, answer, response_data)
+                if content is None:
                     continue
-                data = json.loads(line)
-                if content := data.get('answer'):
-                    answer += content
-                    yield content
+                yield content
             content = ''
         else:
-            raise ValueError(f"Unsupported response.content_type: {content_type}")
+            raise ValueError(f"Unsupported response.content_type: {content_type}, text: {(await response.aread()).decode('utf-8')}.")
         logger.info(f'LLM response_data: ===\n{response_data}\n===')
         yield content
 
+    @staticmethod
+    async def assert_response(response):
+        assert response.status_code == 200, f"LLM response session failed with status code: {response.status_code}, text: {(await response.aread()).decode('utf-8')}."
+        logger.info(f'LLM response session successfully with status code: {response.status_code}')
+
+    @staticmethod
+    async def parse_json_response(response, response_data):
+        response_json = (await response.aread()).decode('utf-8')  # 显式读取字节流按数据, 解码为字符串
+        response_dict = json.loads(response_json)
+        content = response_dict['choices'][0]['message'].get('content', '')
+        if isinstance(content, list):
+            content = next((item['text']['content'] for item in content if item.get('type') == 'text'), content)
+        response_data += response_json + '\n'
+        answer = content
+        return content, answer, response_data
+
+    @staticmethod
+    async def parse_event_stream(line, answer, response_data):
+        response_data += line + '\n'
+        line = line.strip().replace('data: ', '', 1)
+        if not line or line == "[DONE]":
+            return None, answer, response_data
+        data = json.loads(line)
+        choice = data['choices'][0]
+        if content := choice['delta'].get('content', ''):
+            answer += content
+        return content, answer, response_data
+
 class LLMClient(BaseLLMClient):
     # 通用逻辑
-    async def get_completion(self, params) -> str:
-        answer = await super().get_completion(params)
+    async def get_completion(self, params, **kwargs) -> str:
+        answer = await super().get_completion(params, **kwargs)
         return answer
 
-    async def get_stream_completion(self, params) -> AsyncGenerator[str, None]:
+    async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
         """重写父类方法，保持异步生成器类型"""
-        async for content in super().get_stream_completion(params):  # 直接复用父类的流处理
-            yield content  # 逐块传递数据流
+        async with super().get_stream_completion(params, **kwargs) as generator:  # 直接复用父类的流处理
+            async for content in generator:
+                yield content  # 逐块传递数据流
 
 class OpenAIClient(BaseLLMClient):
     # 适配OpenAI通用逻辑
-    async def get_completion(self, params) -> str:
-        answer = await super().get_completion(params)
+    async def get_completion(self, params, **kwargs) -> str:
+        answer = await super().get_completion(params, **kwargs)
         return answer
 
-    async def get_stream_completion(self, params) -> AsyncGenerator[str, None]:
+    async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
         """重写父类方法，保持异步生成器类型"""
-        async for content in super().get_stream_completion(params):  # 直接复用父类的流处理
-            yield content  # 逐块传递数据流
+        async with super().get_stream_completion(params, **kwargs) as generator:  # 直接复用父类的流处理
+            async for content in generator:
+                yield content  # 逐块传递数据流
 
 class OtherClient(BaseLLMClient):
     # 适配其他平台特有逻辑
-    async def get_completion(self, params) -> str:
-        answer = await super().get_completion(params)
+    async def get_completion(self, params, **kwargs) -> str:
+        answer = await super().get_completion(params, **kwargs)
         return answer
 
-    async def get_stream_completion(self, params) -> AsyncGenerator[str, None]:
+    async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
         """重写父类方法，保持异步生成器类型"""
-        async for content in super().get_stream_completion(params):  # 直接复用父类的流处理
-            yield content  # 逐块传递数据流
+        async with super().get_stream_completion(params, **kwargs) as generator:  # 直接复用父类的流处理
+            async for content in generator:
+                yield content  # 逐块传递数据流
 
 class DifyClient(BaseLLMClient):
     # 适配Dify特有逻辑
-    async def get_completion(self, params) -> str:
-        answer = await super().get_completion(params)
-        return answer
 
-    async def get_stream_completion(self, params) -> AsyncGenerator[str, None]:
-        """重写父类方法，保持异步生成器类型"""
-        async for content in super().get_stream_completion(params):  # 直接复用父类的流处理
-            yield content  # 逐块传递数据流
+    def __init__(self, base_url, chat_endpoint, conv_endpoint, headers, concurrency_limit, timeout, **kwargs):
+        super().__init__(base_url, chat_endpoint, headers, concurrency_limit, timeout, **kwargs)
+        self.conv_endpoint = conv_endpoint
+
+    async def _make_request(self, params, **kwargs):
+        """异步HTTP请求核心实现（httpx版）"""
+        try:
+            user_info = kwargs.get("user_info")  # 从kwargs获取
+            conv_params = kwargs.get("conv_params")  # 从kwargs获取
+            param_dict = params.model_dump()
+            user_name = param_dict["user_name"]
+            logger.info(f"LLM request params: ---\n{param_dict}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+                get_response = await self.client.get(self.conv_endpoint, headers=self.headers, params=conv_params)
+                conversations_id = get_response.json().get("data", [])[0]["id"]
+                user_info[user_name] = conversations_id
+                answer = await self.parser(response)  # 使用注入的解析器
+            return answer
+        except httpx.HTTPStatusError as exc:
+            logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
+            raise
+
+    @asynccontextmanager
+    async def _make_stream_request(self, params, **kwargs):
+        """异步流式HTTP请求核心实现（httpx版）"""
+        try:
+            conv_params = kwargs.get("conv_params")  # 从kwargs获取
+            user_info = kwargs.get("user_info")  # 从kwargs获取
+            param_dict = params.model_dump()
+            user_name = param_dict["user_name"]
+            logger.info(f"LLM request params: ---\n{param_dict}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+                get_response = await self.client.get(self.conv_endpoint, params=conv_params, headers=self.headers)
+                conversations_id = get_response.json().get("data", [])[0]["id"]
+                user_info[user_name] = conversations_id
+                gen = await self.stream_parser(response)  # 使用注入的解析器
+                yield gen
+        except httpx.HTTPStatusError as exc:
+            logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
+            raise
+        finally:
+            if hasattr(gen, 'aclose'):  # 检查是否为生成器
+                await gen.aclose()  # 显式关闭
+
+    @staticmethod
+    async def parse_json_response(response, response_data):
+        response_json = (await response.aread()).decode('utf-8')  # 显式读取字节流按数据, 解码为字符串
+        response_dict = json.loads(response_json)
+        content = response_dict.get('answer', '')
+        response_data += response_json + '\n'
+        answer = content
+        return content, answer, response_data
+
+    @staticmethod
+    async def parse_event_stream(line, answer, response_data):
+        response_data += line + '\n'
+        line = line.strip().replace('data: ', '', 1)
+        if not line or line == "[DONE]":
+            return None, answer, response_data
+        data = json.loads(line)
+        if content := data.get('answer', ''):
+            answer += content
+        return content, answer, response_data
+
+    async def get_conv_list(self, ):
+        pass
 
 class FastGPTClient(BaseLLMClient):
     # 适配FastGPT特有逻辑
-    async def get_completion(self, params) -> str:
-        answer = await super().get_completion(params)
-        answer =  answer.strip("0:")
+    async def get_completion(self, params, **kwargs) -> str:
+        answer = await super().get_completion(params, **kwargs)
         return answer
 
-    async def get_stream_completion(self, params) -> AsyncGenerator[str, None]:
+    async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
         """重写父类方法，保持异步生成器类型"""
-        first_chunk = True
-        async for content in super().get_stream_completion(params):
-            if first_chunk:
-                content = content.replace('0:', '', 1).strip()  # 仅处理第一个chunk的前缀, 先去除'0:'再去除空格
-                yield content
-                first_chunk = False
-            else:
-                yield content
+        async with super().get_stream_completion(params, **kwargs) as generator:  # 直接复用父类的流处理
+            async for content in generator:
+                yield content  # 逐块传递数据流
 
-# async def get_completion(base_url, endpoint, headers, params, concurrency_limit=5, timeout=30):
-#     base_url = base_url.rstrip('/') + '/' + endpoint.lstrip('/')
+    @staticmethod
+    async def parse_json_response(response, response_data):
+        content, answer, response_data = await super().parse_json_response(response, response_data)
+        content = content.replace('0:', '', 1).replace('1:', '', 1).strip()
+        answer = content
+        return content, answer, response_data
+
+    @staticmethod
+    async def parse_event_stream(line, answer, response_data):
+        content, answer, response_data = await super().parse_event_stream(line, answer, response_data)
+        answer = answer.replace('0:', '', 1).replace('1:', '', 1).strip()
+        return content, answer, response_data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# async def get_completion(base_url, chat_endpoint, headers, params, concurrency_limit=5, timeout=30):
+#     base_url = base_url.rstrip('/') + '/' + chat_endpoint.lstrip('/')
 #     semaphore = asyncio.Semaphore(concurrency_limit)
 #     param_json = params.model_dump()
 #     logger.info(f"LLM request params: ---\n{param_json}\n---")

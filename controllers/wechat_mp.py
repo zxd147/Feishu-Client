@@ -25,7 +25,7 @@ class WechatMp:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        self.dify_mp_client = DifyClient(base_url, endpoint, headers, concurrency_limit, timeout)
+        self.dify_mp_client = DifyClient(base_url, endpoint, '', headers, concurrency_limit, timeout)
 
     @staticmethod
     def verify(signature, timestamp, nonce, echostr):

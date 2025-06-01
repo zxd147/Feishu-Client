@@ -20,15 +20,15 @@ logger.add(sys.stdout, level="INFO", format=log_format, backtrace=True, diagnose
 
 def configure_logging():
     log_file = 'logs/api.log'
-    logger = logging.getLogger('xxx')
-    logger.setLevel(logging.INFO)
+    _logger = logging.getLogger('xxx')
+    _logger.setLevel(logging.INFO)
     handel_format = '%(asctime)s - %(levelname)s - %(message)s'
     # 设置 propagate 为 False
-    # propagate 用于控制日志消息的传播行为，如果设置为 True（默认值），那么该 logger 记录的消息会向上层的 logger 传播，导致记录两次日志。
-    logger.propagate = False
+    # propagate 用于控制日志消息的传播行为，如果设置为 True（默认值），那么该 _logger 记录的消息会向上层的 _logger 传播，导致记录两次日志。
+    _logger.propagate = False
     # 移除现有的处理器（防止重复）
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    if _logger.hasHandlers():
+        _logger.handlers.clear()
     # 创建控制台处理器
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
@@ -40,11 +40,11 @@ def configure_logging():
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
     # 添加处理器到日志记录器
-    logger.addHandler(console_handler)
-    # logger.addHandler(file_handler)
+    _logger.addHandler(console_handler)
+    # _logger.addHandler(file_handler)
     # 打印初始化成功的日志
-    logger.info("Logging configured successfully for 'xxx' logger.")
-    return logger
+    _logger.info("Logging configured successfully for 'xxx' _logger.")
+    return _logger
 
 
 def setup_logger(log_type="console_file", log_file="logs/api.log", console_level="INFO", file_level="DEBUG"):

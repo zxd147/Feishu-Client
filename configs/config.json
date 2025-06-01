@@ -2,35 +2,37 @@
   "llm_models": {
     "LLM": {
       "base_url": "https://api.openai.com/v1",
-      "endpoint": "/chat/completions",
+      "chat_endpoint": "/chat/completions",
       "api_key": "Bearer sk-llm",
       "concurrency_limit": 10,
       "timeout": 30
     },
     "OpenAI": {
       "base_url": "https://api.openai.com/v1",
-      "endpoint": "/chat/completions",
+      "chat_endpoint": "/chat/completions",
       "api_key": "Bearer sk-openai",
       "concurrency_limit": 10,
       "timeout": 30
     },
     "Other": {
       "base_url": "https://api.openai.com/v1",
-      "endpoint": "/chat/completions",
+      "chat_endpoint": "/chat/completions",
       "api_key": "Bearer sk-other",
       "concurrency_limit": 10,
       "timeout": 30
     },
     "Dify": {
       "base_url": "http://172.16.10.25/v1",
-      "endpoint": "/chat-messages",
+      "chat_endpoint": "/chat-messages",
+      "conv_endpoint": "/conversations",
       "api_key": "Bearer app-dify",
+      "conv_limit": 5,
       "concurrency_limit": 10,
       "timeout": 30
     },
     "FastGPT": {
       "base_url": "https://api.openai.com/v1",
-      "endpoint": "/chat/completions",
+      "chat_endpoint": "/chat/completions",
       "api_key": "Bearer sk-fastgpt",
       "concurrency_limit": 10,
       "timeout": 30

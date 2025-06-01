@@ -1,8 +1,5 @@
 import asyncio
-import copy
 import json
-import uuid
-from concurrent.futures import ThreadPoolExecutor
 
 import lark_oapi as lark
 
@@ -18,19 +15,22 @@ class FeishuRobot:
     def __init__(self):
         self.processed_message_ids = set()  # 用于记录已处理的消息ID
         self.user_info = {}
-        base_url = settings.config.llm_models[settings.fs_model_name].base_url
-        endpoint = settings.config.llm_models[settings.fs_model_name].endpoint
-        api_key = settings.config.llm_models[settings.fs_model_name].api_key
-        concurrency_limit = settings.config.llm_models[settings.fs_model_name].concurrency_limit
-        timeout = settings.config.llm_models[settings.fs_model_name].timeout
-        self.model_name = settings.fs_model_name
+        model_name = settings.fs_model_name
+        base_url = settings.config.llm_models[model_name].base_url
+        chat_endpoint = settings.config.llm_models[model_name].chat_endpoint
+        conv_endpoint = settings.config.llm_models[model_name].conv_endpoint
+        api_key = settings.config.llm_models[model_name].api_key
+        concurrency_limit = settings.config.llm_models[model_name].concurrency_limit
+        timeout = settings.config.llm_models[model_name].timeout
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        self.conv_limit = settings.config.llm_models[model_name].conv_limit
+        self.params = settings.config.llm_param[model_name]
         self.max_retries = settings.max_retries
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        self.dify_fs_client = DifyClient(base_url, endpoint, headers, concurrency_limit, timeout)
         self.feishu_client = None
+        self.dify_fs_client = DifyClient(base_url, chat_endpoint, conv_endpoint, headers, concurrency_limit, timeout)
+        logger.info("Dify client init success!")
+
+    def start(self):
         # 注册事件 Register event
         event_handler = lark.EventDispatcherHandler.builder("", "") \
             .register_p2_im_message_receive_v1(self.do_p2_im_message_receive_v1) \
@@ -39,13 +39,8 @@ class FeishuRobot:
         app_id = settings.app_id
         app_secret = settings.app_secret
         self.feishu_client = Feishu(app_id, app_secret, event_handler)
+        logger.info("Feishu client running...")
         self.feishu_client.start()
-        logger.info("start feishu client...")
-
-    def init_feishu_client(self):
-        loop = asyncio.get_running_loop()
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            loop.run_in_executor(executor, self.sync_init_feishu)
 
     def add_message_id(self, msg_id):
         self.processed_message_ids.add(msg_id)
@@ -70,11 +65,11 @@ class FeishuRobot:
         sender = event.sender
         sender_id = sender.sender_id
         open_id = sender_id.open_id
-        user_id = sender_id.user_id
+        # user_id = sender_id.user_id
 
         # 用户信息处理
-        conversation_id = self.user_info.setdefault(open_id, str(uuid.uuid4().hex[:8]))
         user_name = self.feishu_client.get_user_name(open_id)
+        conversation_id = self.user_info.setdefault(user_name, '')
         logger.info(f"用户: user_name={user_name}, open_id={open_id}, conversation_id={conversation_id}")
     
         # 检查是否已处理过
@@ -82,7 +77,7 @@ class FeishuRobot:
             logger.info(f'忽略重复的消息: {message_id} {data.event.message.content}')
             return
         self.add_message_id(message_id)
-        logger.info(f'收到飞书消息: {lark.JSON.marshal(data, indent=4)}')
+        logger.debug(f'收到飞书消息: {lark.JSON.marshal(data, indent=4)}')
         # 尝试获取或创建事件循环
         loop = asyncio.get_running_loop()
         # 处理文件类型消息
@@ -101,8 +96,8 @@ class FeishuRobot:
             if text in {'重置', '清空对话。', '/reset'}:
                 logger.info(f"已发起新的会话")
                 try:
-                    self.user_info[open_id] = conversation_id = str(uuid.uuid4().hex[:8])
-                    self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text":"聊天上下文已重置"}))
+                    self.user_info[open_id] = ''
+                    self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text":"会话已重置"}))
                     logger.info(f"会话重置成功")
                     return  # 立即返回成功确认
                 except Exception as err:
@@ -112,7 +107,7 @@ class FeishuRobot:
             # 异步处理复杂的消息处理逻辑，尽量减少同步处理时间, 避免超时
             try:
                 # 创建异步任务并添加回调处理
-                loop.create_task(self.text_messages_handler(conversation_id, user_name, chat_type, chat_id, open_id, text))
+                loop.create_task(self.text_messages_handler(user_name, conversation_id, chat_type, open_id, chat_id, text))
                 logger.info("异步任务已提交到事件循环")
             except Exception as err:
                 logger.error(f"用户信息处理失败: {message_id}, {str(err)}")
@@ -126,8 +121,7 @@ class FeishuRobot:
                 file_key = content_json.get('file_key', '')
                 file_name = content_json.get('file_name', '')
                 logger.info(f"收到文件消息: message_id={message_id}, file_key={file_key}, file_name={file_name}")
-                loop.create_task(self.file_message_handle("download_and_uoload", message_id, chat_type, chat_id, open_id, file_key, file_name))
-
+                loop.create_task(self.file_message_handle("download_and_upload", message_id, chat_type, open_id, chat_id, file_key, file_name))
                 # 发送消息告诉用户文件在处理中，请稍等
                 self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "文件正在处理中，请稍等..."})) 
                 return
@@ -138,22 +132,24 @@ class FeishuRobot:
         
         # 处理其他非文本消息
         else:
-            self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", '{"text":"我目前只支持文本和文件消息哦~"}')
+            self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", '{"text":"没有理解您的信息，我现在只支持文本和文件消息哦~"}')
             return  # 立即返回成功确认
         
-    async def text_messages_handler(self, conversation_id, user_name, chat_type, chat_id, open_id, query):
+    async def text_messages_handler(self, user_name, conversation_id, chat_type, open_id, chat_id, query):
         """处理消息的异步核心逻辑"""
         card_id = await self.feishu_client.create_card()
         sequence = 0
         # 发送初始卡片并确保流式更新模式开启
-        response = await self.feishu_client.send_card(card_id, chat_type == "p2p", chat_id, open_id)
+        response = await self.feishu_client.send_card(card_id, chat_type == "p2p", open_id, chat_id)
         logger.info(f"飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
 
-        params = copy.deepcopy(self.model_name)
+        params = self.params.model_dump()
         params["query"] = query
         params["user"] = user_name
         params["conversation_id"] = conversation_id
-        answer = await self.dify_fs_client.get_completion(params)
+        conv_params = {"user": user_name, "limit": self.conv_limit}
+        kwargs = {"user_info": self.user_info, "conv_params": conv_params}
+        answer = await self.dify_fs_client.get_completion(params, **kwargs)
         # 使用重试机制更新卡片
         for retry in range(self.max_retries):
             try:
@@ -171,7 +167,7 @@ class FeishuRobot:
                     return None
 
         answer = ''
-        generator = self.dify_fs_client.get_stream_completion(params)
+        generator = self.dify_fs_client.get_stream_completion(params, **kwargs)
         async for content in generator:
             answer += content
             # 使用重试机制更新卡片
@@ -191,7 +187,7 @@ class FeishuRobot:
                         return None
         return None
 
-    async def file_message_handle(self, operation_type, message_id, chat_type, chat_id, open_id, file_key=None, file_name=''):
+    async def file_message_handle(self, operation_type, message_id, chat_type, open_id, chat_id, file_key=None, file_name=''):
         try:
             file_content = b''
             download_name = ''
@@ -204,21 +200,22 @@ class FeishuRobot:
                     return
                 # 发送成功消息
                 logger.info(f"文件下载成功!")
+                self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "文件下载成功"}))
             elif "upload" in operation_type:
                 # 上传文件
                 file_name_to_use = file_name or download_name
                 result = await self.feishu_client.upload_file_to_approval(file_content, file_name_to_use)
                 if not result or "code" not in result:
                     logger.error(f"上传文件失败: {result}")
-                    self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "上传文件，请重试"}))
+                    self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "上传文件失败，请重试"}))
                     return
                 # 发送成功消息和文件code
                 logger.info(f"文件上传成功!\n文件code: {result['code']}")
+                self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "文件上传成功"}))
         except Exception as err:
             logger.error(f"处理文件异常: {str(err)}")
             self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "处理文件时发生错误，请重试"}))
             return
-    
 
     # async def chat(self, query):
     #     """微信消息处理核心逻辑"""

@@ -5,7 +5,16 @@ from pydantic import BaseModel
 
 class LLMModelsConfig(BaseModel):
     base_url: str
-    endpoint: str = ""
+    chat_endpoint: str = ""
+    conv_endpoint: str = ""
+    api_key: Optional[str] = None
+    conv_limit: int
+    concurrency_limit: int
+    timeout: int
+    
+class DifyModelsConfig(BaseModel):
+    base_url: str
+    chat_endpoint: str = ""
     api_key: Optional[str] = None
     concurrency_limit: int
     timeout: int
@@ -33,6 +42,6 @@ class DifyParamConfig(BaseModel):
 
 class AppConfig(BaseModel):
     # 字典形式，键是模型名称
-    llm_models: Dict[str, LLMModelsConfig]
+    llm_models: Dict[str, Union[LLMModelsConfig, DifyModelsConfig]]
     llm_param: Dict[str, Union[LLMParamConfig, DifyParamConfig]]
 

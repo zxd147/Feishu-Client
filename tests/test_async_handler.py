@@ -1,9 +1,9 @@
 import lark_oapi as lark
 
 # 异步处理函数
-async def async_message_handler(data):
+async def async_message_handler() -> None:
     print("Async handler called")
-    return "success"
+    return
 
 # 注册测试
 event_handler = lark.EventDispatcherHandler.builder("", "") \
