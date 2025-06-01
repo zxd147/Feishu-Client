@@ -150,42 +150,42 @@ class FeishuRobot:
         params["conversation_id"] = conversation_id
         conv_params = {"user": user_name, "limit": self.conv_limit}
         kwargs = {"user_info": self.user_info, "conv_params": conv_params}
-        answer = await self.dify_fs_client.get_completion(params, **kwargs)
-        # 使用重试机制更新卡片
-        for retry in range(self.max_retries):
-            try:
-                # 使用asyncio.create_task来避免阻塞
-                response = await self.feishu_client.update_card(card_id, answer, sequence)
-                sequence += 1
-                logger.info(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
-                break
-            except Exception as err:
-                if retry < self.max_retries - 1:
-                    logger.warning(f"更新卡片失败 (重试 {retry+1}/{self.max_retries}): \n{str(err)}")
-                    await asyncio.sleep(0.2)  # 短暂等待后重试
-                else:
-                    logger.error(f"更新卡片失败: {str(err)}")
-                    return None
+        # answer = await self.dify_fs_client.get_completion(params, **kwargs)
+        # # 使用重试机制更新卡片
+        # for retry in range(self.max_retries):
+        #     try:
+        #         # 使用asyncio.create_task来避免阻塞
+        #         response = await self.feishu_client.update_card(card_id, answer, sequence)
+        #         sequence += 1
+        #         logger.info(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
+        #         break
+        #     except Exception as err:
+        #         if retry < self.max_retries - 1:
+        #             logger.warning(f"更新卡片失败 (重试 {retry+1}/{self.max_retries}): \n{str(err)}")
+        #             await asyncio.sleep(0.2)  # 短暂等待后重试
+        #         else:
+        #             logger.error(f"更新卡片失败: {str(err)}")
+        #             return None
 
-        # answer = ''
-        # generator = self.dify_fs_client.get_stream_completion(params, **kwargs)
-        # async for content in generator:
-        #     answer += content
-        #     # 使用重试机制更新卡片
-        #     for retry in range(self.max_retries):
-        #         try:
-        #             # 使用asyncio.create_task来避免阻塞
-        #             response = await self.feishu_client.update_card(card_id, answer, sequence)
-        #             sequence += 1
-        #             logger.info(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
-        #             break
-        #         except Exception as err:
-        #             if retry < self.max_retries - 1:
-        #                 logger.warning(f"更新卡片失败 (重试 {retry+1}/{self.max_retries}): \n{str(err)}")
-        #                 await asyncio.sleep(0.2)  # 短暂等待后重试
-        #             else:
-        #                 logger.error(f"更新卡片失败: {str(err)}")
-        #                 return None
+        answer = ''
+        generator = self.dify_fs_client.get_stream_completion(params, **kwargs)
+        async for content in generator:
+            answer += content
+            # 使用重试机制更新卡片
+            for retry in range(self.max_retries):
+                try:
+                    # 使用asyncio.create_task来避免阻塞
+                    response = await self.feishu_client.update_card(card_id, answer, sequence)
+                    sequence += 1
+                    logger.info(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
+                    break
+                except Exception as err:
+                    if retry < self.max_retries - 1:
+                        logger.warning(f"更新卡片失败 (重试 {retry+1}/{self.max_retries}): \n{str(err)}")
+                        await asyncio.sleep(0.2)  # 短暂等待后重试
+                    else:
+                        logger.error(f"更新卡片失败: {str(err)}")
+                        return None
         return None
 
     async def file_message_handle(self, operation_type, message_id, chat_type, open_id, chat_id, file_key=None, file_name=''):
