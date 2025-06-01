@@ -170,6 +170,8 @@ class FeishuRobot:
         answer = ''
         generator = self.dify_fs_client.get_stream_completion(params, **kwargs)
         async for content in generator:
+            if not content:
+                continue    
             answer += content
             # 使用重试机制更新卡片
             for retry in range(self.max_retries):
