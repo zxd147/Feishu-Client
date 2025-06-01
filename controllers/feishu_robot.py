@@ -152,7 +152,6 @@ class FeishuRobot:
         kwargs = {"user_info": self.user_info, "conv_params": conv_params}
         answer = await self.dify_fs_client.get_completion(params, **kwargs)
         # 使用重试机制更新卡片
-        answer = "哈哈哈"
         for retry in range(self.max_retries):
             try:
                 # 使用asyncio.create_task来避免阻塞
