@@ -48,9 +48,8 @@ class BaseLLMClient:
     async def _make_request(self, params, **kwargs):
         """异步HTTP请求核心实现（httpx版）"""
         try:
-            param_dict = params.model_dump()
-            logger.info(f"LLM request params: ---\n{param_dict}\n---")
-            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+            logger.info(f"LLM request params: ---\n{params}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 answer = await self.parser(response)  # 使用注入的解析器
             return answer
         except httpx.HTTPStatusError as exc:
@@ -61,9 +60,8 @@ class BaseLLMClient:
     async def _make_stream_request(self, params, **kwargs):
         """异步流式HTTP请求核心实现（httpx版）"""
         try:
-            param_dict = params.model_dump()
-            logger.info(f"LLM request params: ---\n{param_dict}\n---")
-            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+            logger.info(f"LLM request params: ---\n{params}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 gen = await self.stream_parser(response)  # 使用注入的解析器
                 yield gen
         except httpx.HTTPStatusError as exc:
@@ -189,10 +187,9 @@ class DifyClient(BaseLLMClient):
         try:
             user_info = kwargs.get("user_info")  # 从kwargs获取
             conv_params = kwargs.get("conv_params")  # 从kwargs获取
-            param_dict = params.model_dump()
-            user_name = param_dict["user_name"]
-            logger.info(f"LLM request params: ---\n{param_dict}\n---")
-            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+            user_name = params["user_name"]
+            logger.info(f"LLM request params: ---\n{params}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 get_response = await self.client.get(self.conv_endpoint, headers=self.headers, params=conv_params)
                 conversations_id = get_response.json().get("data", [])[0]["id"]
                 user_info[user_name] = conversations_id
@@ -208,10 +205,9 @@ class DifyClient(BaseLLMClient):
         try:
             conv_params = kwargs.get("conv_params")  # 从kwargs获取
             user_info = kwargs.get("user_info")  # 从kwargs获取
-            param_dict = params.model_dump()
-            user_name = param_dict["user_name"]
-            logger.info(f"LLM request params: ---\n{param_dict}\n---")
-            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=param_dict) as response:
+            user_name = params["user_name"]
+            logger.info(f"LLM request params: ---\n{params}\n---")
+            async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 get_response = await self.client.get(self.conv_endpoint, params=conv_params, headers=self.headers)
                 conversations_id = get_response.json().get("data", [])[0]["id"]
                 user_info[user_name] = conversations_id
