@@ -55,9 +55,6 @@ class BaseLLMClient:
         except httpx.HTTPStatusError as exc:
             logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
             raise
-        finally:
-            if hasattr(gen, 'aclose'):  # 检查是否为生成器
-                await gen.aclose()  # 显式关闭
 
     @asynccontextmanager
     async def _make_stream_request(self, params, **kwargs):
@@ -65,7 +62,7 @@ class BaseLLMClient:
         try:
             logger.info(f"LLM request params: ---\n{params}\n---")
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
-                gen = await self.stream_parser(response)  # 使用注入的解析器
+                gen = self.stream_parser(response)  # 使用注入的解析器
                 yield gen
         except httpx.HTTPStatusError as exc:
             logger.error(f'LLM response failed with status code: {exc.response.status_code}, text: {exc.response.text}')
