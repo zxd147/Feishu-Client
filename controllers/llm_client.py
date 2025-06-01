@@ -88,7 +88,8 @@ class BaseLLMClient:
                     continue
         else:
             raise ValueError(f"Unsupported response.content_type: {content_type}")
-        logger.info(f'LLM response_data: ===\n{response_data}\n===')
+        logger.info(f'LLM response data: ===\n{response_data}\n===')
+        logger.info(f'LLM answer: {answer}')
         return answer
 
     async def _default_stream_parser(self, response) -> AsyncGenerator[str, None]:
@@ -97,19 +98,20 @@ class BaseLLMClient:
         content_type = (getattr(response, 'content_type', None) or response.headers.get('Content-Type', '') or '').lower()
         if content_type.split(';')[0].strip() == 'application/json':
             response_data = "blocking...\n"
-            content, _, response_data = await self.parse_json_response(response, response_data)
+            content, answer, response_data = await self.parse_json_response(response, response_data)
         elif content_type.split(';')[0].strip() == 'text/event-stream':
             answer = ''
             response_data = "streaming...\n"
             async for line in response.aiter_lines():
-                content, _, response_data = await self.parse_event_stream(line, answer, response_data)
+                content, answer, response_data = await self.parse_event_stream(line, answer, response_data)
                 if content is None:
                     continue
                 yield content
             content = ''
         else:
             raise ValueError(f"Unsupported response.content_type: {content_type}, text: {(await response.aread()).decode('utf-8')}.")
-        logger.info(f'LLM response_data: ===\n{response_data}\n===')
+        logger.info(f'LLM response data: ===\n{response_data}\n===')
+        logger.info(f'LLM answer: ===\n{answer}\n===')
         yield content
 
     @staticmethod
