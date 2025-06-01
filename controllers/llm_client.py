@@ -38,7 +38,7 @@ class BaseLLMClient:
     async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
         """统一流式请求入口，子类可覆盖具体解析逻辑"""
         try:
-            async with self.make_request(params, **kwargs) as generator:
+            async with self.make_stream_request(params, **kwargs) as generator:
                 async for content in generator:
                     yield content
         except (httpx.HTTPError, httpx.RequestError, httpx.StreamError, httpx.RemoteProtocolError, json.JSONDecodeError, KeyError, Exception) as exc:
