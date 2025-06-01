@@ -187,7 +187,7 @@ class DifyClient(BaseLLMClient):
         try:
             user_info = kwargs.get("user_info")  # 从kwargs获取
             conv_params = kwargs.get("conv_params")  # 从kwargs获取
-            user_name = params["user_name"]
+            user_name = params["user"]
             logger.info(f"LLM request params: ---\n{params}\n---")
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 get_response = await self.client.get(self.conv_endpoint, headers=self.headers, params=conv_params)
@@ -205,7 +205,7 @@ class DifyClient(BaseLLMClient):
         try:
             conv_params = kwargs.get("conv_params")  # 从kwargs获取
             user_info = kwargs.get("user_info")  # 从kwargs获取
-            user_name = params["user_name"]
+            user_name = params["user"]
             logger.info(f"LLM request params: ---\n{params}\n---")
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 get_response = await self.client.get(self.conv_endpoint, params=conv_params, headers=self.headers)
