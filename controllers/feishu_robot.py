@@ -142,7 +142,7 @@ class FeishuRobot:
         card_id = await self.feishu_client.create_card()
         sequence = 0
         # 发送初始卡片并确保流式更新模式开启
-        response = await self.feishu_client.send_card(card_id, chat_type == "p2p", open_id, chat_id)
+        response = await self.feishu_client.send_init_card(card_id, chat_type == "p2p", open_id, chat_id)
         sequence += 1
         logger.info(f"飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
 

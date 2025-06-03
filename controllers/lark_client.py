@@ -11,6 +11,7 @@ from lark_oapi.api.cardkit.v1 import ContentCardElementRequest, ContentCardEleme
     ContentCardElementResponse, CreateCardRequest, CreateCardRequestBody, CreateCardResponse
 from lark_oapi.api.contact.v3 import *
 from lark_oapi.api.im.v1 import *
+from lark_oapi.api.im.v1 import CreateMessageRequest
 
 from utils.logger import get_loger
 
@@ -78,23 +79,21 @@ class Feishu:
 
     async def create_card(self):
         # 创建卡片 https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/cardkit-v1/card/create
-        card_create_request: CreateCardRequest = CreateCardRequest.builder() \
+        create_card_request: CreateCardRequest = CreateCardRequest.builder() \
             .request_body(CreateCardRequestBody.builder()
                           .type("card_json")
                           .data(json.dumps(self.card_template)
                                 ).build()).build()
 
         # 发起请求
-        card_create_response: CreateCardResponse = self.client.cardkit.v1.card.create(card_create_request)
-        if not card_create_response.success():
+        create_card_response: CreateCardResponse = self.client.cardkit.v1.card.create(create_card_request)
+        if not create_card_response.success():
             logger.error(
-                f"client.cardkit.v1.card.create failed, code: {card_create_response.code}, msg: {card_create_response.msg}, log_id: {card_create_response.get_log_id()}, resp: \n{json.dumps(json.loads(card_create_response.raw.content), indent=4, ensure_ascii=False)}")
+                f"client.cardkit.v1.card.create failed, code: {create_card_response.code}, msg: {create_card_response.msg}, log_id: {create_card_response.get_log_id()}, resp: \n{json.dumps(json.loads(create_card_response.raw.content), indent=4, ensure_ascii=False)}")
             return None
+        return create_card_response.data.card_id
 
-        return card_create_response.data.card_id
-
-    async def send_card(self, card_id, is_p2p, open_id, chat_id):
-
+    async def send_init_card(self, card_id, is_p2p, open_id, chat_id):
         if is_p2p:
             response = self._send_message("open_id", open_id, "interactive", "{\"type\":\"card\",\"data\":{\"card_id\":\"" + card_id + "\"}}")
         else:
@@ -102,13 +101,14 @@ class Feishu:
         return response
 
     async def update_card(self, card_id, content, sequence=0):
-        # 添加重试机制
+        # 发送消息 Send a message
+        # # https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create
         max_retries = 3
         retry_delay = 0.5  # 减少初始重试延迟
-
+        # 添加重试机制
         for retry in range(max_retries):
             try:
-                request: ContentCardElementRequest = ContentCardElementRequest.builder() \
+                content_card_element_request: ContentCardElementRequest = ContentCardElementRequest.builder() \
                     .card_id(card_id) \
                     .element_id("markdown_1") \
                     .request_body(ContentCardElementRequestBody.builder()
@@ -117,12 +117,12 @@ class Feishu:
                                   .sequence(sequence)
                                   .build()) \
                     .build()
-                response: ContentCardElementResponse = self.client.cardkit.v1.card_element.content(request)
-                if not response.success():
+                content_card_element_response: ContentCardElementResponse = self.client.cardkit.v1.card_element.content(content_card_element_request)
+                if not content_card_element_response.success():
                     raise Exception(
-                        f"client.im.v1.chat.create failed, code: {response.code}, msg: {response.msg}, log_id: {response.get_log_id()}"
+                        f"client.im.v1.chat.create failed, code: {content_card_element_response.code}, msg: {content_card_element_response.msg}, log_id: {content_card_element_response.get_log_id()}, resp: \n{json.dumps(json.loads(content_card_element_response.raw.content), indent=4, ensure_ascii=False)}"
                     )
-                return response
+                return content_card_element_response
             except Exception as e:
                 if "Server Internal Error" in str(e) and retry < max_retries - 1:
                     logger.warning(f"飞书服务器错误，第{retry+1}次重试，将在{retry_delay}秒后重试")
@@ -130,17 +130,13 @@ class Feishu:
                     retry_delay *= 1.5  # 减少指数退避增长率
                     return None
                 else:
-                    if retry == max_retries - 1:
+                    if retry >= max_retries - 1:
                         logger.error(f"更新卡片失败，已重试{max_retries}次: {str(e)}")
                     raise  # 重试用尽，重新抛出
-
-    # 发送消息
-    # Send a message
-    # # https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create
         return None
 
     def _send_message(self, receive_id_type, receive_id, msg_type, content):
-        request = (
+        create_send_message_request: CreateMessageRequest = (
             CreateMessageRequest.builder()
             .receive_id_type(receive_id_type)
             .request_body(
@@ -152,12 +148,12 @@ class Feishu:
             )
             .build()
         )
-        response = self.client.im.v1.message.create(request)
-        if not response.success():
+        create_send_message_response: CreateMessageResponse = self.client.im.v1.message.create(create_send_message_request)
+        if not create_send_message_response.success():
             raise Exception(
-                f"client.im.v1.message.create failed, code: {response.code}, msg: {response.msg}, log_id: {response.get_log_id()}"
+                f"client.im.v1.message.create failed, code: {create_send_message_response.code}, msg: {create_send_message_response.msg}, log_id: {create_send_message_response.get_log_id()}"
             )
-        return response
+        return create_send_message_response
 
     def send_common_message(self, is_p2p, open_id,chat_id, msg_type, content):
         if is_p2p:
@@ -167,23 +163,23 @@ class Feishu:
 
     def get_user_name(self, open_id):
         # 构造请求对象
-        request: GetUserRequest = GetUserRequest.builder() \
+        get_user_name_request: GetUserRequest = GetUserRequest.builder() \
             .user_id(open_id) \
             .user_id_type("open_id") \
             .build()
 
         # 发起请求
-        response: GetUserResponse = self.client.contact.v3.user.get(request)
+        get_user_name_response: GetUserResponse = self.client.contact.v3.user.get(get_user_name_request)
         #输出response
 
-        logger.info(f"client.contact.v3.user.get , code: {response.code}, msg: {response.msg}, log_id: {response.get_log_id()}, resp: \n{json.dumps(json.loads(response.raw.content), indent=4, ensure_ascii=False)}")
+        logger.info(f"client.contact.v3.user.get , code: {get_user_name_response.code}, msg: {get_user_name_response.msg}, log_id: {get_user_name_response.get_log_id()}, resp: \n{json.dumps(json.loads(get_user_name_response.raw.content), indent=4, ensure_ascii=False)}")
         # 处理失败返回
-        if not response.success():
+        if not get_user_name_response.success():
             lark.logger.error(
-                f"client.contact.v3.user.get failed, code: {response.code}, msg: {response.msg}, log_id: {response.get_log_id()}, resp: \n{json.dumps(json.loads(response.raw.content), indent=4, ensure_ascii=False)}")
+                f"client.contact.v3.user.get failed, code: {get_user_name_response.code}, msg: {get_user_name_response.msg}, log_id: {get_user_name_response.get_log_id()}, resp: \n{json.dumps(json.loads(get_user_name_response.raw.content), indent=4, ensure_ascii=False)}")
             return None
 
-        return response.data.user.name
+        return get_user_name_response.data.user.name
 
     async def download_message_file(self, message_id, file_key):
         """
@@ -195,25 +191,24 @@ class Feishu:
         logger.info(f"开始下载消息文件: message_id={message_id}, file_key={file_key}")
         try:
             # 构造请求获取文件资源
-            request = GetMessageResourceRequest.builder() \
+            download_message_file_request = GetMessageResourceRequest.builder() \
                 .message_id(message_id) \
                 .file_key(file_key) \
                 .type("file") \
                 .build()
-
             # 发起请求
-            response = self.client.im.v1.message_resource.get(request)
+            download_message_file_response = self.client.im.v1.message_resource.get(download_message_file_request)
 
             # 处理失败返回
-            if not response.success():
+            if not download_message_file_response.success():
                 logger.error(
-                    f"下载文件失败: code={response.code}, msg={response.msg}, log_id={response.get_log_id()}"
+                    f"下载文件失败: code={download_message_file_response.code}, msg={download_message_file_response.msg}, log_id={download_message_file_response.get_log_id()}"
                 )
                 return None, None
 
             # 从响应中获取文件内容和文件名
-            file_content = response.file.read()
-            file_name = response.file_name
+            file_content = download_message_file_response.file.read()
+            file_name = download_message_file_response.file_name
 
             logger.info(f"文件下载成功: {file_name}, 大小: {len(file_content)} 字节")
             return file_content, file_name
@@ -239,22 +234,18 @@ class Feishu:
                 "app_id": self.client_id,
                 "app_secret": self.client_secret
             }
-
             token_response = requests.post(token_url, json=token_data)
             token_result = token_response.json()
-
             if token_response.status_code != 200 or token_result.get('code') != 0:
                 logger.error(f"获取tenant_access_token失败: {token_result}")
                 return None
-
             tenant_access_token = token_result.get('tenant_access_token')
 
             # 准备上传文件
-            url = "https://www.feishu.cn/approval/openapi/v2/file/upload"
+            upload_file_url = "https://www.feishu.cn/approval/openapi/v2/file/upload"
             headers = {
                 "Authorization": f"Bearer {tenant_access_token}"
             }
-
             # 准备multipart/form-data格式的数据，与Java代码保持一致
             files = {
                 'content': (file_name, io.BytesIO(file_content)),
@@ -265,22 +256,20 @@ class Feishu:
             }
 
             # 发送请求
-            response = requests.post(url, headers=headers, files=files, data=data)
-
+            upload_file_response = requests.post(upload_file_url, headers=headers, files=files, data=data)
             # 检查响应
-            if response.status_code != 200:
-                logger.error(f"上传文件到审批系统失败: status_code={response.status_code}, response={response.text}")
+            if upload_file_response.status_code != 200:
+                logger.error(f"上传文件到审批系统失败: status_code={upload_file_response.status_code}, response={upload_file_response.text}")
                 return None
 
             # 解析响应
-            result = response.json()
+            result = upload_file_response.json()
             if result.get('code') != 0:
                 logger.error(f"上传文件到审批系统响应错误: {result}")
                 return None
 
             file_code = result.get('data', {}).get('code')
             file_url = result.get('data', {}).get('url')
-
             logger.info(f"文件上传成功: code={file_code}, url={file_url}")
             return {
                 'code': file_code,
