@@ -10,7 +10,6 @@ from utils.logger import get_loger
 
 logger = get_loger()
 
-
 class FeishuRobot:
     def __init__(self):
         self.processed_message_ids = set()  # 用于记录已处理的消息ID
