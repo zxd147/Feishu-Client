@@ -41,6 +41,9 @@ class FeishuRobot:
         logger.info("Feishu client running...")
         self.feishu_client.start()
 
+    def stop(self):
+        self.feishu_client.stop()
+
     def add_message_id(self, msg_id):
         self.processed_message_ids.add(msg_id)
         
