@@ -20,7 +20,6 @@ def graceful_shutdown(signum=None, frame=None):
     logger.info("Service stopped.")
     sys.exit(0)
 
-
 if __name__ == "__main__":
     # 注册信号处理
     signal.signal(signal.SIGINT, graceful_shutdown)  # Ctrl+C
@@ -36,3 +35,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Fatal error: {str(e)}", exc_info=True)
         graceful_shutdown()
+

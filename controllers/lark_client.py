@@ -66,26 +66,20 @@ class Feishu:
         self.cli.start()
 
     def stop(self):
-        """线程安全的异步关闭方法"""
-        def async_stop_in_thread():
-            """在新线程中运行的事件循环关闭逻辑"""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:  # 无事件循环时新建
             loop = asyncio.new_event_loop()
-            try:
-                loop.run_until_complete(self.async_stop())
-            finally:
-                loop.stop()  # 强制停止事件循环
-                loop.close()
-        threading.Thread(target=async_stop_in_thread, daemon=True).start()
+            asyncio.set_event_loop(loop)
+        # 通过主线程事件循环调度异步任务执行异步清理
+        loop.run_until_complete(self.async_stop())
 
     async def async_stop(self):
         try:
-            if hasattr(self.cli, '_disconnect'):
-                await self.cli._disconnect()  # 优先使用内部方法
-            elif hasattr(self.cli, '_ws'):
-                await self.cli._ws.close()
-        finally:
-            if hasattr(self.cli, '_loop'):
-                self.cli._loop.stop()
+            await self.cli._disconnect()  # 优先使用内部方法
+            logger.info("Disconnect cli success.")
+        except Exception as e:
+            logger.error(f"Disconnect cli failed: {e}")
 
     async def create_card(self):
         # 创建卡片 https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/cardkit-v1/card/create
