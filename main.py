@@ -13,8 +13,8 @@ def graceful_shutdown(signum=None, frame=None):
     """处理优雅退出，支持信号和手动调用"""
     logger.info(f"Received signal {signum}, shutting down gracefully...")
     # 执行清理逻辑（如关闭数据库连接等）
-    if hasattr(graceful_shutdown, 'feishu_robot'):
-        graceful_shutdown.feishu_robot.stop()
+    # if hasattr(graceful_shutdown, 'feishu_robot'):
+    #     graceful_shutdown.feishu_robot.stop()
     logger.info("Service stopped.")
     sys.exit(0)
 
