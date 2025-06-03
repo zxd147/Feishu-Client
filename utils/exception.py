@@ -1,9 +1,9 @@
 import json
 
-from utils.logger import get_loger
+from utils.logger import get_logger
 import inspect
 
-logger = get_loger()
+logger = get_logger()
 
 
 def log_exception(exc):

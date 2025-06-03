@@ -6,9 +6,9 @@ import lark_oapi as lark
 from configs.settings import settings
 from controllers.lark_client import Feishu
 from controllers.llm_client import DifyClient
-from utils.logger import get_loger
+from utils.logger import get_logger
 
-logger = get_loger()
+logger = get_logger()
 
 class FeishuRobot:
     def __init__(self):

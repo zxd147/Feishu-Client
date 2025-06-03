@@ -13,10 +13,10 @@ from lark_oapi.api.contact.v3 import *
 from lark_oapi.api.im.v1 import *
 from lark_oapi.api.im.v1 import CreateMessageRequest
 
-from utils.logger import get_loger
+from utils.logger import get_logger
 
 
-logger = get_loger()
+logger = get_logger()
 
 
 class Feishu:

@@ -46,7 +46,6 @@ def configure_logging():
     _logger.info("Logging configured successfully for 'xxx' _logger.")
     return _logger
 
-
 def setup_logger(log_type="console_file", log_file="logs/api.log", console_level="INFO", file_level="DEBUG"):
     # 获取数值级别，方便在过滤器中使用
     logger.remove()
@@ -72,10 +71,8 @@ def setup_logger(log_type="console_file", log_file="logs/api.log", console_level
                f"File logging configured successfully with level '{file_level}' to '{log_file}'.")
     return logger
 
-
-def get_loger():
+def get_logger():
     return logger
-
 
 def rename_file(ori_path='logs/api.log'):
     # 检查文件是否存在

@@ -5,9 +5,9 @@ from typing import Optional, Any, Callable, AsyncGenerator
 import httpx
 
 from utils.exception import log_exception
-from utils.logger import get_loger
+from utils.logger import get_logger
 
-logger = get_loger()
+logger = get_logger()
 
 
 class BaseLLMClient:

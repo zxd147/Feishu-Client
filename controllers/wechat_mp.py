@@ -7,10 +7,10 @@ from fastapi.responses import Response
 
 from configs.settings import settings
 from controllers.llm_client import DifyClient
-from utils.logger import get_loger
+from utils.logger import get_logger
 from utils.parse import generate_reply
 
-logger = get_loger()
+logger = get_logger()
 
 
 class WechatMp:
