@@ -147,7 +147,7 @@ class FeishuRobot:
         # 发送初始卡片并确保流式更新模式开启
         response = await self.feishu_client.send_init_card(card_id, chat_type == "p2p", open_id, chat_id)
         sequence += 1
-        logger.info(f"飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
+        logger.debug(f"飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
 
         params = self.params.model_dump()
         params["query"] = query
@@ -161,8 +161,12 @@ class FeishuRobot:
         #     try:
         #         # 使用asyncio.create_task来避免阻塞
         #         response = await self.feishu_client.update_card(card_id, answer, sequence)
+        #         if sequence <= 1:
+        #             logger.info(f"卡片更新成功！sequence={sequence}. ---\n... ...\n---")
+        #             logger.debug(f"飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}---\n... ...\n---")
+        #         else:
+        #             logger.debug(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
         #         sequence += 1
-        #         logger.debug(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
         #         break
         #     except Exception as err:
         #         if retry < self.max_retries - 1:
@@ -184,7 +188,8 @@ class FeishuRobot:
                     # 使用asyncio.create_task来避免阻塞
                     response = await self.feishu_client.update_card(card_id, answer, sequence)
                     if sequence <= 1:
-                        logger.info(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}---\n... ...\n---")
+                        logger.info(f"卡片更新成功！sequence={sequence}. ---\n... ...\n---")
+                        logger.debug(f"飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}---\n... ...\n---")
                     else:
                         logger.debug(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
                     sequence += 1
