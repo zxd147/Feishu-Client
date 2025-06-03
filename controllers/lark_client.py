@@ -2,6 +2,7 @@
 import asyncio
 import io
 import json
+import threading
 import traceback
 import uuid
 
@@ -11,7 +12,6 @@ from lark_oapi.api.cardkit.v1 import ContentCardElementRequest, ContentCardEleme
     ContentCardElementResponse, CreateCardRequest, CreateCardRequestBody, CreateCardResponse
 from lark_oapi.api.contact.v3 import *
 from lark_oapi.api.im.v1 import *
-from lark_oapi.api.im.v1 import CreateMessageRequest
 
 from utils.logger import get_logger
 
@@ -66,16 +66,26 @@ class Feishu:
         self.cli.start()
 
     def stop(self):
-        loop = None  # 显式初始化
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
+        """线程安全的异步关闭方法"""
+        def async_stop_in_thread():
+            """在新线程中运行的事件循环关闭逻辑"""
             loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        finally:
-            loop.run_until_complete(self.cli._disconnect())
-            if loop is not None and not loop.is_running():
+            try:
+                loop.run_until_complete(self.async_stop())
+            finally:
+                loop.stop()  # 强制停止事件循环
                 loop.close()
+        threading.Thread(target=async_stop_in_thread, daemon=True).start()
+
+    async def async_stop(self):
+        try:
+            if hasattr(self.cli, '_disconnect'):
+                await self.cli._disconnect()  # 优先使用内部方法
+            elif hasattr(self.cli, '_ws'):
+                await self.cli._ws.close()
+        finally:
+            if hasattr(self.cli, '_loop'):
+                self.cli._loop.stop()
 
     async def create_card(self):
         # 创建卡片 https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/cardkit-v1/card/create

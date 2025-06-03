@@ -3,10 +3,12 @@ logger封装
 """
 import logging
 import os
+import shutil
 import sys
 from datetime import datetime
 
 from loguru import logger
+
 
 # 移除所有默认的处理器
 logger.remove()
@@ -75,6 +77,7 @@ def get_logger():
     return logger
 
 def rename_file(ori_path='logs/api.log'):
+    new_path = ori_path
     # 检查文件是否存在
     if os.path.exists(ori_path):
         # 获取文件的目录和文件名
@@ -87,8 +90,8 @@ def rename_file(ori_path='logs/api.log'):
         formatted_time = datetime.fromtimestamp(creation_time).strftime("%Y%m%d_%H%M%S")
         # 构建新的文件路径
         new_path = os.path.join(ori_dir, f'{formatted_time}_{ori_file}')
-        # 重命名文件
-        os.rename(ori_path, new_path)
-        ori_path = new_path
-    return ori_path
+        shutil.copy2(ori_path, new_path)
+        # 删除旧文件
+        os.remove(ori_path)
+    return ori_path, new_path
 
