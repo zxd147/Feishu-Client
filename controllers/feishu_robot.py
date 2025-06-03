@@ -55,6 +55,12 @@ class FeishuRobot:
 
     def do_p2_im_message_receive_v1(self, data: lark.im.v1.P2ImMessageReceiveV1) -> None:
         """飞书消息处理入口 - 必须在3秒内响应确认，长任务应该异步处理"""
+        # 尝试获取或创建事件循环
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()  # 手动创建
+            asyncio.set_event_loop(loop)  # 将新循环绑定到当前线程
         # 提取消息基本信息
         event = data.event
         message = event.message
@@ -66,20 +72,17 @@ class FeishuRobot:
         sender_id = sender.sender_id
         open_id = sender_id.open_id
         # user_id = sender_id.user_id
-
-        # 用户信息处理
-        user_name = self.feishu_client.get_user_name(open_id)
-        conversation_id = self.user_info.setdefault(user_name, '')
-        logger.info(f"用户: user_name={user_name}, open_id={open_id}, conversation_id={conversation_id}")
-    
         # 检查是否已处理过
         if message_id in self.processed_message_ids:
             logger.info(f'忽略重复的消息: {message_id} {data.event.message.content}')
             return
         self.add_message_id(message_id)
         logger.debug(f'收到飞书消息: {lark.JSON.marshal(data, indent=4)}')
-        # 尝试获取或创建事件循环
-        loop = asyncio.get_running_loop()
+        # 用户信息处理
+        user_name = self.feishu_client.get_user_name(open_id)
+        conversation_id = self.user_info.setdefault(user_name, '')
+        logger.info(f"用户: user_name={user_name}, open_id={open_id}, conversation_id={conversation_id}")
+
         # 处理文件类型消息
         if message_type == "text":
             # 解析用户消息
@@ -91,7 +94,6 @@ class FeishuRobot:
             except Exception as err:
                 logger.error(f"消息处理异常: {err}")
                 return  # 立即返回成功确认
-            
             # 处理重置指令
             if text in {'重置', '清空对话。', '/reset'}:
                 logger.info(f"已发起新的会话")
