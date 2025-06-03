@@ -15,6 +15,7 @@ from lark_oapi.api.im.v1 import CreateMessageRequest
 
 from utils.logger import get_loger
 
+
 logger = get_loger()
 
 
@@ -280,5 +281,4 @@ class Feishu:
             logger.error(f"上传文件到审批系统异常: {str(e)}")
             logger.error(traceback.format_exc())
             return None
-            
             
