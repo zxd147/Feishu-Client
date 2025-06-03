@@ -134,7 +134,7 @@ class BaseLLMClient:
     async def parse_event_stream(line, answer, response_data):
         response_data += line + '\n'
         line = line.strip().replace('data: ', '', 1)
-        if not line or line == "[DONE]":
+        if not line or line == "[DONE]" or not line.startswith("{"):
             return None, answer, response_data
         data = json.loads(line)
         choice = data['choices'][0]
@@ -237,7 +237,7 @@ class DifyClient(BaseLLMClient):
     async def parse_event_stream(line, answer, response_data):
         response_data += line + '\n'
         line = line.strip().replace('data: ', '', 1)
-        if not line or line == "[DONE]":
+        if not line or line == "[DONE]" or not line.startswith("{"):
             return None, answer, response_data
         data = json.loads(line)
         if content := data.get('answer', ''):
