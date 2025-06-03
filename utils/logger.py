@@ -54,17 +54,17 @@ def setup_logger(log_type="console_file", log_file="logs/api.log", console_level
     rename_file(log_file)
     console_level_no = logger.level(console_level).no
     file_level_no = logger.level(file_level).no
-    if log_type == "console":
+    if log_type in ("console", "console_file"):
         logger.add(sys.stdout, level=console_level, format=log_format, backtrace=True, diagnose=True,
                    filter=lambda record: console_level_no <= record["level"].no != file_level_no)
-    elif log_type == "file":
-        logger.add(log_file, level=file_level, format=log_format, backtrace=True, diagnose=True,
+    if log_type in ("file", "console_file"):
+        logger.add(log_file, encoding="utf-8", level=file_level, format=log_format, backtrace=True, diagnose=True,
                    filter=lambda record: file_level_no <= record["level"].no != console_level_no)
-    else:
-        logger.add(sys.stdout, level=console_level, format=log_format, backtrace=True, diagnose=True,
-                   filter=lambda record: console_level_no <= record["level"].no != file_level_no)
-        logger.add(log_file, level=file_level, format=log_format, backtrace=True, diagnose=True,
-                   filter=lambda record: file_level_no <= record["level"].no != console_level_no)
+    # else:
+    #     logger.add(sys.stdout, level=console_level, format=log_format, backtrace=True, diagnose=True,
+    #                filter=lambda record: console_level_no <= record["level"].no != file_level_no)
+    #     logger.add(log_file, level=file_level, format=log_format, backtrace=True, diagnose=True,
+    #                filter=lambda record: file_level_no <= record["level"].no != console_level_no)
     if "console" in log_type:
         logger.log(console_level,
                f"File logging configured successfully with level '{console_level}' to 'sys.stdout'.")
