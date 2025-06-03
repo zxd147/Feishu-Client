@@ -104,7 +104,7 @@ class FeishuRobot:
                 try:
                     self.user_info[user_name]["conversation_id"] = ''
                     self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text":"会话已重置"}))
-                    logger.info(f'会话重置成功， 已将原会话ID "{old_conversation_id}" 重置为新的会话ID： "{self.user_info[user_name]["conversation_id"]}"')
+                    logger.info(f'会话重置成功， 已将原会话ID ```{old_conversation_id}``` 重置为新的会话ID： ```{self.user_info[user_name]["conversation_id"]}```')
 
                     return  # 立即返回成功确认
                 except Exception as err:
