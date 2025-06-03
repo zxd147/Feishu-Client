@@ -25,9 +25,9 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, graceful_shutdown)  # Ctrl+C
     signal.signal(signal.SIGTERM, graceful_shutdown)  # kill
     try:
+        logger.info("Service starting...")
         feishu_robot = FeishuRobot()
         graceful_shutdown.feishu_robot = feishu_robot  # 保存引用供清理使用
-        logger.info("Service starting...")
         feishu_robot.start()
     except KeyboardInterrupt:
         logger.warning("Service stoping...")
