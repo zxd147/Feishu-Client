@@ -83,8 +83,8 @@ class FeishuRobot:
         logger.debug(f'新的飞书消息: {lark.JSON.marshal(data, indent=4)}')
         # 用户信息
         user_name = self.feishu_client.get_user_name(open_id)
-        conversation_id = self.user_info.setdefault(user_name, {}).setdefault('conversation_id', '')
-        logger.info(f"用户: user_name={user_name}, open_id={open_id}, conversation_id={conversation_id}")
+        old_conversation_id = self.user_info.setdefault(user_name, {}).setdefault('conversation_id', '')
+        logger.info(f"用户: user_name={user_name}, open_id={open_id}, conversation_id={old_conversation_id}")
 
         # 处理文件类型消息
         if message_type == "text":
@@ -103,7 +103,7 @@ class FeishuRobot:
                 try:
                     self.user_info[user_name]["conversation_id"] = ''
                     self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text":"会话已重置"}))
-                    logger.info(f'会话重置成功， 新的会话ID为 {self.user_info[user_name]["conversation_id"]}')
+                    logger.info(f'会话重置成功， 已将原会话ID "{old_conversation_id}" 重置为新的会话ID： "{self.user_info[user_name]["conversation_id"]}"')
 
                     return  # 立即返回成功确认
                 except Exception as err:
@@ -154,7 +154,7 @@ class FeishuRobot:
         params = self.params.model_dump()
         params["query"] = query
         params["user"] = user_name
-        params["conversation_id"] = self.user_info[user_name]["conversation_id"]
+        params["conversation_id"] = self.user_info[user_name].get("conversation_id", '')
         conv_params = {"user": user_name, "limit": self.conv_limit}
         kwargs = {"user_info": self.user_info, "conv_params": conv_params}
         # answer = await self.dify_fs_client.get_completion(params, **kwargs)
