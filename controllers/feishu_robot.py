@@ -112,7 +112,7 @@ class FeishuRobot:
             try:
                 # 创建异步任务并添加回调处理
                 loop.create_task(self.text_messages_handler(user_name, conversation_id, chat_type, open_id, chat_id, text))
-                logger.info("异步任务已提交到事件循环")
+                logger.info("异步任务已后台提交到事件循环")
             except Exception as err:
                 logger.error(f"用户信息处理失败: {message_id}, {str(err)}")
                 return
@@ -127,7 +127,8 @@ class FeishuRobot:
                 logger.info(f"收到文件消息: message_id={message_id}, file_key={file_key}, file_name={file_name}")
                 loop.create_task(self.file_message_handle("download_and_upload", message_id, chat_type, open_id, chat_id, file_key, file_name))
                 # 发送消息告诉用户文件在处理中，请稍等
-                self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "文件正在处理中，请稍等..."})) 
+                self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text": "文件正在处理中，请稍等..."}))
+                logger.info("异步任务已后台提交到事件循环")
                 return
             except Exception as err:
                 logger.error(f"解析文件消息异常: {str(err)}")

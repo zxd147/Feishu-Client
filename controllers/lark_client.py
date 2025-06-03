@@ -66,16 +66,15 @@ class Feishu:
         self.cli.start()
 
     def stop(self):
+        loop = None  # 显式初始化
         try:
-            # 优先使用get_running_loop()（Python 3.7+）
             loop = asyncio.get_running_loop()
-            loop.create_task(self.cli._disconnect())  # 异步调度
-        except RuntimeError:  # 无运行循环时
-            # 创建新循环并同步执行
+        except RuntimeError:
             loop = asyncio.new_event_loop()
-            try:
-                loop.run_until_complete(self.cli._disconnect())
-            finally:
+            asyncio.set_event_loop(loop)
+        finally:
+            loop.run_until_complete(self.cli._disconnect())
+            if loop is not None and not loop.is_running():
                 loop.close()
 
     async def create_card(self):
