@@ -183,8 +183,11 @@ class FeishuRobot:
                 try:
                     # 使用asyncio.create_task来避免阻塞
                     response = await self.feishu_client.update_card(card_id, answer, sequence)
+                    if sequence <= 1:
+                        logger.info(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
+                    else:
+                        logger.debug(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
                     sequence += 1
-                    logger.debug(f"卡片更新成功！sequence={sequence}. \n飞书响应: code={response.code}, msg={response.msg}, data={getattr(response, 'data', None)}, log_id={response.get_log_id()}")
                     break
                 except Exception as err:
                     if retry < self.max_retries - 1:
