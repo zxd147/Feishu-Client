@@ -196,7 +196,8 @@ class DifyClient(BaseLLMClient):
                 get_response = await self.client.get(self.conv_endpoint, headers=self.headers, params=conv_params)
                 conv_data = get_response.json()
                 conversations_id = conv_data.get("data", [])[0]["id"]
-                user_info[user_name] = conversations_id
+                user_info[user_name]["conversation_id"] = conversations_id
+                logger.info(f"已获取到conversations id列表，将{user_name}的conversations id更新为{conversations_id}")
                 answer = await self.parser(response)  # 使用注入的解析器
             return answer
         except httpx.HTTPStatusError as exc:
@@ -214,7 +215,8 @@ class DifyClient(BaseLLMClient):
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
                 get_response = await self.client.get(self.conv_endpoint, params=conv_params, headers=self.headers)
                 conversations_id = get_response.json().get("data", [])[0]["id"]
-                user_info[user_name] = conversations_id
+                user_info[user_name]["conversation_id"] = conversations_id
+                logger.info(f"已获取到conversations id列表，将{user_name}的conversations id更新为{conversations_id}")
                 gen = self.stream_parser(response)  # 使用注入的解析器
                 yield gen
         except httpx.HTTPStatusError as exc:

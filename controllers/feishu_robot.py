@@ -80,9 +80,9 @@ class FeishuRobot:
             return
         self.add_message_id(message_id)
         logger.debug(f'收到飞书消息: {lark.JSON.marshal(data, indent=4)}')
-        # 用户信息处理
+        # 用户信息
         user_name = self.feishu_client.get_user_name(open_id)
-        conversation_id = self.user_info.setdefault(user_name, '')
+        conversation_id = self.user_info.setdefault(user_name, {}).setdefault('conversation_id', '')
         logger.info(f"用户: user_name={user_name}, open_id={open_id}, conversation_id={conversation_id}")
 
         # 处理文件类型消息
@@ -98,11 +98,12 @@ class FeishuRobot:
                 return  # 立即返回成功确认
             # 处理重置指令
             if text in {'重置', '清空对话。', '/reset'}:
-                logger.info(f"已发起新的会话")
+                logger.info(f"准备发起新的会话")
                 try:
-                    self.user_info[open_id] = ''
+                    self.user_info[user_name]["conversation_id"] = ''
                     self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", json.dumps({"text":"会话已重置"}))
-                    logger.info(f"会话重置成功")
+                    logger.info(f'会话重置成功， 新的会话ID为 {self.user_info[user_name]["conversation_id"]}')
+
                     return  # 立即返回成功确认
                 except Exception as err:
                     logger.error(f"会话重置信息发送失败: {err}")
