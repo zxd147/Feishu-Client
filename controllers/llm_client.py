@@ -33,7 +33,7 @@ class BaseLLMClient:
             return answer
         except (httpx.HTTPError, httpx.RequestError, json.JSONDecodeError, KeyError, Exception) as exc:
             log_exception(exc)
-            raise
+            return "调用LLM平台报错"
 
     async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
         """统一流式请求入口，子类可覆盖具体解析逻辑"""
@@ -43,7 +43,7 @@ class BaseLLMClient:
                     yield content
         except (httpx.HTTPError, httpx.RequestError, httpx.StreamError, httpx.RemoteProtocolError, json.JSONDecodeError, KeyError, Exception) as exc:
             log_exception(exc)
-            raise
+            yield "调用LLM平台报错"
 
     async def _make_request(self, params, **kwargs):
         """异步HTTP请求核心实现（httpx版）"""
