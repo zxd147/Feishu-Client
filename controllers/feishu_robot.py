@@ -79,7 +79,8 @@ class FeishuRobot:
             logger.info(f'忽略重复的消息: {message_id} {data.event.message.content}')
             return
         self.add_message_id(message_id)
-        logger.debug(f'收到飞书消息: {lark.JSON.marshal(data, indent=4)}')
+        logger.info(f'接收到新的飞书消息')
+        logger.debug(f'新的飞书消息: {lark.JSON.marshal(data, indent=4)}')
         # 用户信息
         user_name = self.feishu_client.get_user_name(open_id)
         conversation_id = self.user_info.setdefault(user_name, {}).setdefault('conversation_id', '')
