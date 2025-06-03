@@ -6,16 +6,17 @@ from pydantic import BaseModel
 class LLMModelsConfig(BaseModel):
     base_url: str
     chat_endpoint: str = ""
-    conv_endpoint: str = ""
     api_key: Optional[str] = None
-    conv_limit: int
     concurrency_limit: int
     timeout: int
     
 class DifyModelsConfig(BaseModel):
     base_url: str
     chat_endpoint: str = ""
+    conv_endpoint: str = ""
     api_key: Optional[str] = None
+    conv_limit: int
+    sort_by: str
     concurrency_limit: int
     timeout: int
 

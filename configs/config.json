@@ -27,6 +27,7 @@
       "conv_endpoint": "/conversations",
       "api_key": "Bearer app-dify",
       "conv_limit": 5,
+      "sort_by": "-created_at",
       "concurrency_limit": 10,
       "timeout": 30
     },

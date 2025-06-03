@@ -23,6 +23,7 @@ class FeishuRobot:
         timeout = settings.config.llm_models[model_name].timeout
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         self.conv_limit = settings.config.llm_models[model_name].conv_limit
+        self.sort_by = settings.config.llm_models[model_name].sort_by
         self.params = settings.config.llm_param[model_name]
         self.max_retries = settings.max_retries
         self.feishu_client = None
@@ -155,7 +156,7 @@ class FeishuRobot:
         params["query"] = query
         params["user"] = user_name
         params["conversation_id"] = self.user_info[user_name].get("conversation_id", '')
-        conv_params = {"user": user_name, "limit": self.conv_limit}
+        conv_params = {"user": user_name, "limit": self.conv_limit, "sort_by": self.sort_by}
         kwargs = {"user_info": self.user_info, "conv_params": conv_params}
         # answer = await self.dify_fs_client.get_completion(params, **kwargs)
         # # 使用重试机制更新卡片
