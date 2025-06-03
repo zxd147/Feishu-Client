@@ -88,7 +88,7 @@ class BaseLLMClient:
                     continue
         else:
             raise ValueError(f"Unsupported response.content_type: {content_type}")
-        logger.info(f'LLM response data[:300]: ===\n{response_data[:300]}\n===')
+        logger.info(f'LLM response data[:500]: ===\n{response_data[:500]}\n===')
         logger.info(f'LLM answer: {answer}')
         return answer
 
@@ -110,7 +110,7 @@ class BaseLLMClient:
             content = ''
         else:
             raise ValueError(f"Unsupported response.content_type: {content_type}, text: {(await response.aread()).decode('utf-8')}.")
-        logger.info(f'LLM response data[:300]: ===\n{response_data[:300]}\n===')
+        logger.info(f'LLM response data[:500]: ===\n{response_data[:500]}\n===')
         logger.info(f'LLM answer: ===\n{answer}\n===')
         yield content
 
