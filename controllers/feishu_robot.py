@@ -112,7 +112,7 @@ class FeishuRobot:
             # 异步处理复杂的消息处理逻辑，尽量减少同步处理时间, 避免超时
             try:
                 # 创建异步任务并添加回调处理
-                loop.create_task(self.text_messages_handler(user_name, conversation_id, chat_type, open_id, chat_id, text))
+                loop.create_task(self.text_messages_handler(user_name, chat_type, open_id, chat_id, text))
                 logger.info("异步任务已后台提交到事件循环")
             except Exception as err:
                 logger.error(f"用户信息处理失败: {message_id}, {str(err)}")
@@ -141,7 +141,7 @@ class FeishuRobot:
             self.feishu_client.send_common_message(chat_type == "p2p", open_id, chat_id, "text", '{"text":"没有理解您的信息，我现在只支持文本和文件消息哦~"}')
             return  # 立即返回成功确认
         
-    async def text_messages_handler(self, user_name, conversation_id, chat_type, open_id, chat_id, query):
+    async def text_messages_handler(self, user_name, chat_type, open_id, chat_id, query):
         """处理消息的异步核心逻辑"""
         card_id = await self.feishu_client.create_card()
         sequence = 0
@@ -153,7 +153,7 @@ class FeishuRobot:
         params = self.params.model_dump()
         params["query"] = query
         params["user"] = user_name
-        params["conversation_id"] = conversation_id
+        params["conversation_id"] = self.user_info[user_name]["conversation_id"]
         conv_params = {"user": user_name, "limit": self.conv_limit}
         kwargs = {"user_info": self.user_info, "conv_params": conv_params}
         # answer = await self.dify_fs_client.get_completion(params, **kwargs)
