@@ -67,7 +67,7 @@ def setup_logger(log_type="console_file", log_file="logs/api.log", console_level
     #                filter=lambda record: file_level_no <= record["level"].no != console_level_no)
     if "console" in log_type:
         logger.log(console_level,
-               f"File logging configured successfully with level '{console_level}' to 'sys.stdout'.")
+               f"Console logging configured successfully with level '{console_level}' to 'sys.stdout'.")
     if "file" in log_type:
         logger.log(file_level_no,
                f"File logging configured successfully with level '{file_level}' to '{log_file}'.")
