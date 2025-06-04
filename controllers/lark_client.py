@@ -2,7 +2,6 @@
 import asyncio
 import io
 import json
-import threading
 import traceback
 import uuid
 
@@ -14,7 +13,6 @@ from lark_oapi.api.contact.v3 import *
 from lark_oapi.api.im.v1 import *
 
 from utils.logger import get_logger
-
 
 logger = get_logger()
 
