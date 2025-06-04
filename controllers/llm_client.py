@@ -193,16 +193,8 @@ class DifyClient(BaseLLMClient):
             user_name = params["user"]
             logger.info(f"LLM request params: ---\n{params}\n---")
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
-                # if user_info[user_name]["conversation_id"] == "":
-                if True:
-                    get_response = await self.client.get(self.conv_endpoint, headers=self.headers, params=conv_params)
-                    conv_data = get_response.json()
-                    conv_list = conv_data.get("data", [])
-                    logger.info(f"获取到的conversations id列表: {conv_list}")
-                    new_conversations_id = conv_list[0]["id"]
-                    old_conversations_id = user_info[user_name].get("conversation_id")
-                    user_info[user_name]["conversation_id"] = new_conversations_id
-                    logger.info(f"已获取到conversations id列表，将{user_name}的conversations id从{old_conversations_id}更新为{new_conversations_id}")
+                if not user_info[user_name]["conversation_id"]:
+                    await self.update_conversation_id(user_name, user_info, conv_params)
                 answer = await self.parser(response)  # 使用注入的解析器
             return answer
         except httpx.HTTPStatusError as exc:
@@ -218,16 +210,8 @@ class DifyClient(BaseLLMClient):
             user_name = params["user"]
             logger.info(f"LLM request params: ---\n{params}\n---")
             async with self.client.stream("POST", self.chat_endpoint, headers=self.headers, json=params) as response:
-                # if user_info[user_name]["conversation_id"] == "":
-                if True:
-                    get_response = await self.client.get(self.conv_endpoint, params=conv_params, headers=self.headers)
-                    conv_data = get_response.json()
-                    conv_list = conv_data.get("data", [])
-                    logger.info(f"获取到的conversations id列表: {conv_list}")
-                    new_conversations_id = conv_list[0]["id"]
-                    old_conversations_id = user_info[user_name].get("conversation_id")
-                    user_info[user_name]["conversation_id"] = new_conversations_id
-                    logger.info(f'已获取到conversations id列表，将```{user_name}```的conversations id从```{old_conversations_id}```更新为```{new_conversations_id}```')
+                if not user_info[user_name]["conversation_id"]:
+                    await self.update_conversation_id(user_name, user_info, conv_params)
                 gen = self.stream_parser(response)  # 使用注入的解析器
                 yield gen
         except httpx.HTTPStatusError as exc:
@@ -257,8 +241,15 @@ class DifyClient(BaseLLMClient):
             answer += content
         return content, answer, response_data
 
-    async def get_conv_list(self, ):
-        pass
+    async def update_conversation_id(self, user_name, user_info, conv_params):
+        get_response = await self.client.get(self.conv_endpoint, params=conv_params, headers=self.headers)
+        conv_data = get_response.json()
+        conv_list = conv_data.get("data", [])
+        logger.debug(f"获取到的conversations id列表: {conv_list}")
+        new_conversations_id = conv_list[0]["id"]
+        old_conversations_id = user_info[user_name].get("conversation_id")
+        user_info[user_name]["conversation_id"] = new_conversations_id
+        logger.info(f'已获取到conversations id列表，将```{user_name}```的conversations id从```{old_conversations_id}```更新为```{new_conversations_id}```')
 
 class FastGPTClient(BaseLLMClient):
     # 适配FastGPT特有逻辑
