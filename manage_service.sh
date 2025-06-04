@@ -8,6 +8,13 @@ PYTHON_PATH="/opt/anaconda3/envs/cl/bin/python"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 start_service() {
+    # 检查是否已有同名进程（即使PID文件丢失）
+    EXISTING_PID=$(pgrep -f "${PYTHON_PATH}.*main.py")
+    if [ -n "$EXISTING_PID" ]; then
+        echo "Conflict: Process already running (PID: $EXISTING_PID). Use 'stop' first."
+        return 1
+    fi
+    
     if [ -f "$PID_FILE" ]; then
         if ps -p $(cat $PID_FILE) > /dev/null; then
             echo "Service is already running (PID: $(cat $PID_FILE))"
@@ -30,14 +37,27 @@ stop_service() {
     fi
 
     PID=$(cat "$PID_FILE")
-    if ps -p $PID > /dev/null; then
-        echo "Stopping ${SERVICE_NAME} (PID: $PID)..."
-        kill -TERM $PID
-        rm -f "$PID_FILE"
-        echo "Service stopped"
-    else
+    if ! ps -p $PID > /dev/null; then
         echo "Service not running (PID: $PID)"
         rm -f "$PID_FILE"
+        return 1
+    fi
+
+    echo "Stopping ${SERVICE_NAME} (PID: $PID)..."
+    kill -TERM $PID
+    sleep 2  # 等待进程响应TERM信号
+
+    if ps -p $PID > /dev/null; then
+        echo "Process still alive, sending SIGKILL..."
+        kill -9 $PID  # 强制终止
+        sleep 1
+    fi
+
+    if ! ps -p $PID > /dev/null; then
+      rm -f "$PID_FILE"
+      echo "Service stopped"
+    else
+      echo "ERROR!!!Failed to stop service (PID: $PID)"
     fi
 }
 
