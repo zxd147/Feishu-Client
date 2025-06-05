@@ -16,7 +16,7 @@ logger = get_logger()
 class WechatMp:
     def __init__(self):
         base_url = settings.config.llm_models[settings.mp_model_name].base_url
-        endpoint = settings.config.llm_models[settings.mp_model_name].endpoint
+        chat_endpoint = settings.config.llm_models[settings.mp_model_name].chat_endpoint
         api_key = settings.dify_mp_secret or settings.config.llm_models[settings.mp_model_name].api_key
         concurrency_limit = settings.config.llm_models[settings.mp_model_name].concurrency_limit
         timeout = settings.config.llm_models[settings.mp_model_name].timeout
@@ -25,7 +25,7 @@ class WechatMp:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        self.dify_mp_client = DifyClient(base_url, endpoint, '', headers, concurrency_limit, timeout)
+        self.dify_mp_client = DifyClient(base_url, chat_endpoint, '', headers, concurrency_limit, timeout)
 
     @staticmethod
     def verify(signature, timestamp, nonce, echostr):
@@ -59,7 +59,7 @@ class WechatMp:
         try:
             response_content = await self.dify_mp_client.get_completion(params)
             # from controllers.llm_client import get_completion
-            # response_content = await get_completion(self.base_url, self.endpoint, self.headers, params, concurrency_limit=5, timeout=30)
+            # response_content = await get_completion(self.base_url, self.chat_endpoint, self.headers, params, concurrency_limit=5, timeout=30)
             logger.info(f'Dify MP Response message: {response_content}')  # 查看消息解析是否正确
             # 返回前端
             response_xml = generate_reply(message['FromUserName'], message['ToUserName'], int(time.time()), response_content)
@@ -73,10 +73,10 @@ class WechatMp:
     #     """测试用例"""
     #     model_name = settings.model_name
     #     base_url = settings.config.llm_models[model_name].base_url
-    #     endpoint = settings.config.llm_models[model_name].endpoint
+    #     chat_endpoint = settings.config.llm_models[model_name].chat_endpoint
     #     api_key = "https://api.weixin.qq.com/cgi-bin/token"
     #     query = "你好"
-    #     answer = await get_completion(base_url, endpoint, api_key, query)
+    #     answer = await get_completion(base_url, chat_endpoint, api_key, query)
     #     print(answer)
 
 
