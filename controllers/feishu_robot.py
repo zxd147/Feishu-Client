@@ -30,7 +30,7 @@ class FeishuRobot:
         self.dify_fs_client = DifyClient(base_url, chat_endpoint, conv_endpoint, headers, concurrency_limit, timeout)
         logger.info("Dify client init success!")
 
-    def start(self):
+    def run(self):
         # 注册事件 Register event
         event_handler = lark.EventDispatcherHandler.builder("", "") \
             .register_p2_im_message_receive_v1(self.do_p2_im_message_receive_v1) \
@@ -42,7 +42,7 @@ class FeishuRobot:
         logger.info("Feishu client running...")
         self.feishu_client.start()
 
-    def stop(self):
+    def terminate(self):
         self.feishu_client.stop()
 
     def add_message_id(self, msg_id):

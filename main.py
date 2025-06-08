@@ -8,16 +8,15 @@ setup_logger()
 logger = get_logger()
 
 def graceful_shutdown(signum=None, frame=None):
-    """信号驱动的优雅退出，无需依赖.stop()方法"""
+    """信号驱动的优雅退出"""
     logger.warning(f"Received signal {signum or 'manual'}, shutting down...")
     # 执行非异步的清理逻辑（如关闭文件、数据库连接等）
-    # 示例：手动释放资源（替代.stop()）
     if hasattr(graceful_shutdown, 'feishu_robot'):
         logger.warning("Releasing Feishu resources...")
         # 直接释放关键资源（根据实际需求调整）
-        graceful_shutdown.feishu_robot.stop()  # 假设FeishuRobot有stop方法
+        graceful_shutdown.feishu_robot.terminate()
         del graceful_shutdown.feishu_robot
-    logger.info("Service stopped.")
+    logger.info("Service terminated.")
     sys.exit(0)
 
 if __name__ == "__main__":
@@ -28,7 +27,7 @@ if __name__ == "__main__":
         logger.info("Service starting...")
         feishu_robot = FeishuRobot()
         graceful_shutdown.feishu_robot = feishu_robot  # 保存引用供清理使用
-        feishu_robot.start()
+        feishu_robot.run()
     except KeyboardInterrupt:
         logger.warning("Service stoping...")
         graceful_shutdown()
