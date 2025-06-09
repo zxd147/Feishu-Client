@@ -9,7 +9,6 @@ from datetime import datetime
 
 from loguru import logger
 
-
 # 移除所有默认的处理器
 logger.remove()
 logger.bind()

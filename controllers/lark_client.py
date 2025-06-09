@@ -11,6 +11,7 @@ from lark_oapi.api.cardkit.v1 import ContentCardElementRequest, ContentCardEleme
     ContentCardElementResponse, CreateCardRequest, CreateCardRequestBody, CreateCardResponse
 from lark_oapi.api.contact.v3 import *
 from lark_oapi.api.im.v1 import *
+from lark_oapi.ws.exception import *
 
 from utils.logger import get_logger
 
@@ -64,20 +65,7 @@ class Feishu:
         self.cli.start()
 
     def stop(self):
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:  # 无事件循环时新建
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        # 通过主线程事件循环调度异步任务执行异步清理
-        loop.run_until_complete(self.async_stop())
-
-    async def async_stop(self):
-        try:
-            await self.cli._disconnect()  # 优先使用内部方法
-            logger.info("Disconnect cli success.")
-        except Exception as e:
-            logger.error(f"Disconnect cli failed: {e}")
+        return None
 
     async def create_card(self):
         # 创建卡片 https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/cardkit-v1/card/create
@@ -119,7 +107,8 @@ class Feishu:
                                   .sequence(sequence)
                                   .build()) \
                     .build()
-                content_card_element_response: ContentCardElementResponse = self.client.cardkit.v1.card_element.content(content_card_element_request)
+                content_card_element_response: ContentCardElementResponse = self.client.cardkit.v1.card_element.content(
+                    content_card_element_request)
                 if not content_card_element_response.success():
                     raise Exception(
                         f"client.im.v1.chat.create failed, code: {content_card_element_response.code}, msg: {content_card_element_response.msg}, log_id: {content_card_element_response.get_log_id()}, resp: \n{json.dumps(json.loads(content_card_element_response.raw.content), indent=4, ensure_ascii=False)}"
@@ -127,7 +116,7 @@ class Feishu:
                 return content_card_element_response
             except Exception as e:
                 if "Server Internal Error" in str(e) and retry < max_retries - 1:
-                    logger.warning(f"飞书服务器错误，第{retry+1}次重试，将在{retry_delay}秒后重试")
+                    logger.warning(f"飞书服务器错误，第{retry + 1}次重试，将在{retry_delay}秒后重试")
                     await asyncio.sleep(retry_delay)
                     retry_delay *= 1.5  # 减少指数退避增长率
                     return None
@@ -157,7 +146,7 @@ class Feishu:
             )
         return create_send_message_response
 
-    def send_common_message(self, is_p2p, open_id,chat_id, msg_type, content):
+    def send_common_message(self, is_p2p, open_id, chat_id, msg_type, content):
         if is_p2p:
             self._send_message("open_id", open_id, msg_type, content)
         else:
@@ -172,9 +161,6 @@ class Feishu:
 
         # 发起请求
         get_user_name_response: GetUserResponse = self.client.contact.v3.user.get(get_user_name_request)
-        #输出response
-
-        logger.info(f"client.contact.v3.user.get , code: {get_user_name_response.code}, msg: {get_user_name_response.msg}, log_id: {get_user_name_response.get_log_id()}, resp: \n{json.dumps(json.loads(get_user_name_response.raw.content), indent=4, ensure_ascii=False)}")
         # 处理失败返回
         if not get_user_name_response.success():
             lark.logger.error(
@@ -282,4 +268,8 @@ class Feishu:
             logger.error(f"上传文件到审批系统异常: {str(e)}")
             logger.error(traceback.format_exc())
             return None
-            
+
+async def _select():
+    while True:
+        await asyncio.sleep(3600)
+
