@@ -11,7 +11,6 @@ from lark_oapi.api.cardkit.v1 import ContentCardElementRequest, ContentCardEleme
     ContentCardElementResponse, CreateCardRequest, CreateCardRequestBody, CreateCardResponse
 from lark_oapi.api.contact.v3 import *
 from lark_oapi.api.im.v1 import *
-from lark_oapi.ws.exception import *
 
 from utils.logger import get_logger
 
