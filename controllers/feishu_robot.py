@@ -43,6 +43,7 @@ class FeishuRobot:
         self.feishu_client.start()
 
     def terminate(self):
+        logger.info("Feishu client terminating...")
         self.feishu_client.stop()
 
     def add_message_id(self, msg_id):
