@@ -4,7 +4,7 @@ from typing import Optional, Any, Callable, AsyncGenerator
 
 import httpx
 
-from utils.exception import log_exception
+from utils.exception import llm_exception
 from utils.logger import get_logger
 
 logger = get_logger()
@@ -32,7 +32,7 @@ class BaseLLMClient:
             answer = await self.make_request(params, **kwargs)
             return answer
         except (httpx.HTTPError, httpx.RequestError, json.JSONDecodeError, KeyError, Exception) as exc:
-            log_exception(exc)
+            llm_exception(exc)
             return "调用LLM平台报错"
 
     async def get_stream_completion(self, params, **kwargs) -> AsyncGenerator[str, None]:
@@ -42,7 +42,7 @@ class BaseLLMClient:
                 async for content in generator:
                     yield content
         except (httpx.HTTPError, httpx.RequestError, httpx.StreamError, httpx.RemoteProtocolError, json.JSONDecodeError, KeyError, Exception) as exc:
-            log_exception(exc)
+            llm_exception(exc)
             yield "调用LLM平台报错"
 
     async def _make_request(self, params, **kwargs):

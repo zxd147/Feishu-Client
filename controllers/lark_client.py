@@ -11,11 +11,13 @@ from lark_oapi.api.cardkit.v1 import ContentCardElementRequest, ContentCardEleme
     ContentCardElementResponse, CreateCardRequest, CreateCardRequestBody, CreateCardResponse
 from lark_oapi.api.contact.v3 import *
 from lark_oapi.api.im.v1 import *
+from lark_oapi.ws.exception import ClientException
 
 from utils.logger import get_logger
+from utils.loop import get_loop
 
 logger = get_logger()
-
+loop = get_loop()
 
 class Feishu:
     card_template = {
@@ -60,11 +62,39 @@ class Feishu:
         self.cli = lark.ws.Client(client_id, client_secret, event_handler=event_handler, log_level=lark.LogLevel.DEBUG)
         self.client = lark.Client.builder().app_id(client_id).app_secret(client_secret).build()
 
+    def __getattr__(self, name):
+        """当访问不存在的属性或方法时自动尝试从cli对象获取"""
+        try:
+            # 优先尝试从self.cli获取属性
+            return getattr(self.cli, name)
+        except AttributeError:
+            # 如果cli也没有该属性，抛出标准错误
+            raise AttributeError(f"'{self.__class__.__name__}'对象及其cli对象均未定义属性'{name}'")
+
     def start(self):
-        self.cli.start()
+        try:
+            loop.run_until_complete(self._connect())
+            logger.info("connect success!")
+        except ClientException as e:
+            logger.error(f"connect failed, err: {e}")
+            raise e
+        except Exception as e:
+            logger.error(f"connect failed, err: {e}")
+            loop.run_until_complete(self._disconnect())
+            if self._auto_reconnect:
+                loop.run_until_complete(self._reconnect())
+            else:
+                raise e
+        loop.create_task(self._ping_loop())
 
     def stop(self):
-        return None
+        try:
+            loop.run_until_complete(self._disconnect())
+            logger.info("disconnect success.")
+        except Exception as e:
+            logger.error(f"disconnect failed, err: {e}")
+        finally:
+            loop.stop()
 
     async def create_card(self):
         # 创建卡片 https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/cardkit-v1/card/create
@@ -267,8 +297,3 @@ class Feishu:
             logger.error(f"上传文件到审批系统异常: {str(e)}")
             logger.error(traceback.format_exc())
             return None
-
-async def _select():
-    while True:
-        await asyncio.sleep(3600)
-
