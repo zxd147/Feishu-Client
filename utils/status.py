@@ -84,6 +84,6 @@ def graceful_shutdown(signum=None, frame=None):
         del graceful_shutdown.feishu_robot
     graceful_shutdown._is_cleaned = True  # 加标记
     exit_code = 0 if signum in (signal.SIGINT, signal.SIGTERM) else 1
-    logger.info(f"Service terminated, will exit with code {exit_code}.")
+    logger.info(f"Service terminated, exit with code {exit_code}.")
     sys.exit(exit_code)
 

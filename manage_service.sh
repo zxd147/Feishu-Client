@@ -2,7 +2,7 @@
 
 # 服务管理脚本
 SERVICE_NAME="feishu_client"
-PID_FILE="/tmp/${SERVICE_NAME}.pid"
+PID_FILE="${HOME}/.run/${SERVICE_NAME}.pid"
 LOG_FILE="output.log"
 PYTHON_PATH="/opt/anaconda3/envs/cl/bin/python"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -14,7 +14,7 @@ start_service() {
         echo "Conflict: Process already running (PID: $EXISTING_PID). Use 'stop' first."
         return 1
     fi
-    
+
     if [ -f "$PID_FILE" ]; then
         if ps -p $(cat $PID_FILE) > /dev/null; then
             echo "Service is already running (PID: $(cat $PID_FILE))"
